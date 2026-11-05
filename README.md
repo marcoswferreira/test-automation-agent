@@ -2,12 +2,12 @@
 
 [Versão em Português](README.pt-BR.md)
 
-An autonomous, intelligent web test automation tool that:
-1. **Evaluates visual and structural UI changes** between application versions (Baseline vs. Updated release).
-2. **Explores interfaces autonomously** driven by high-level natural language user goals.
-3. **Applies multimodal computer vision** using the **Set-of-Marks (SoM)** technique to map interactive elements and compute resilient locators.
+An autonomous, production-ready web test automation agent that:
+1. **Evaluates visual and structural UI changes** between application versions (e.g. Production vs. Staging).
+2. **Explores live web applications** autonomously driven by high-level natural language user goals.
+3. **Applies multimodal computer vision** using the **Set-of-Marks (SoM)** technique to map interactive elements and compute resilient locators (`data-testid`, `id`, `text`).
 4. **Dynamically generates idiomatic, modular Robot Framework suites** (`.robot` + `.resource`) powered by **Playwright** (`robotframework-browser`).
-5. **Executes and Self-Heals tests automatically** when locators break or UI layouts shift.
+5. **Executes and Self-Heals tests automatically** in CI/CD pipelines when locators break or layouts change.
 
 ---
 
@@ -16,7 +16,7 @@ An autonomous, intelligent web test automation tool that:
 ```mermaid
 flowchart TD
     subgraph Vision ["1. Vision & Inspection (Playwright + OpenCV + Pillow)"]
-        Page["Target Web App (URL)"] --> Inspector["Browser Inspector"]
+        Page["Target Web App (Live URL / Local)"] --> Inspector["Browser Inspector"]
         Inspector --> Screenshots["Screenshots"]
         Inspector --> DOM["DOM & Bounding Boxes"]
         Screenshots --> SoM["Set-of-Marks Annotator"]
@@ -51,88 +51,176 @@ flowchart TD
 - Python 3.10+
 - Node.js 18+ (required by `robotframework-browser` Playwright backend)
 
-### Environment Setup
+### Step-by-Step Setup
 
 ```bash
-# 1. Create and activate virtual environment
+# 1. Clone the repository and enter the folder
+git clone https://github.com/your-username/test-automation-agent.git
+cd test-automation-agent
+
+# 2. Create and activate a virtual environment
 python3 -m venv .venv
 source .venv/bin/activate
 
-# 2. Install dependencies
+# 3. Install Python dependencies
 pip install -r requirements.txt
 
-# 3. Initialize Robot Framework Browser backend and Chromium
+# 4. Initialize Robot Framework Browser and install Playwright Chromium
 rfbrowser init --skip-browsers
 playwright install chromium
 
-# 4. Install the package in editable mode
+# 5. Install the package in editable mode (registers the 'agent-rf' CLI command)
 pip install -e . --no-build-isolation --no-deps
 ```
 
-### API Key Configuration (Optional for Cloud Gemini Vision)
-If you want to use cloud-hosted multimodal models (Gemini), export your API key:
+### LLM API Key Configuration
+To enable multimodal vision reasoning for complex web pages:
 ```bash
-export GEMINI_API_KEY="your_api_key_here"
+export GEMINI_API_KEY="your_api_key_from_google_ai_studio"
 ```
-*(Note: The agent includes an intelligent offline heuristic engine that runs with 100% functionality and zero external dependencies when no API key is provided).*
+*(Note: When no API key is provided, the agent runs in **intelligent offline heuristic mode** with 100% core capability, making it fully operational in private environments and air-gapped CI/CD systems).*
 
 ---
 
-## 💻 How to Use (`agent-rf` CLI)
+## 💻 How to Run the Project
 
-### 1. Visual Difference & Regression Mode (`diff`)
-Compares a baseline version with an updated release, highlights visual shifts with heatmaps/bounding boxes, and dynamically generates regression tests covering new and modified elements:
+The tool provides an intuitive CLI (`agent-rf`) that can test **real live websites (`https://...`)**, **local dev servers (`http://localhost:...`)**, and **offline files**:
+
+### CLI Flags at a Glance
+| Flag | Description | Default |
+| :--- | :--- | :---: |
+| `--run / --no-run` | Automatically executes the generated suite with Robot Framework | `--run` |
+| `--heal / --no-heal` | Activates self-healing loop on execution failures | `--heal` |
+| `--headed / --headless` | Opens a visible browser window on your desktop to watch interactions live | `--headless` |
+| `--output-dir, -o` | Directory where suites, logs, and screenshots are saved | `./generated_tests` |
+
+---
+
+## 🎯 Real-World Use Cases & Examples
+
+### Use Case 1: Intent-Driven E2E Test Generation (`explore`)
+Generate production-ready test suites for a user flow by simply stating what you want to test in plain English or Portuguese.
 
 ```bash
+# Example against a live SaaS / E-commerce site:
+agent-rf explore https://example.com/login \
+  --intent "Enter credentials, click Sign In, and verify dashboard navigation" \
+  --output-dir ./tests_login \
+  --run
+
+# Want to watch the browser interact live on your monitor? Add --headed:
+agent-rf explore https://example.com/checkout \
+  --intent "Add product to cart, fill discount coupon, and complete checkout" \
+  --headed
+```
+
+**What the agent does:**
+1. Navigates to the live site via Playwright (waiting for SPAs / network idle).
+2. Captures full-page screenshots and labels all interactive elements with high-contrast numbered badges (**Set-of-Marks**).
+3. Prompts the multimodal LLM to reason over the visual UI and produce keywords and test scenarios.
+4. Generates modular `.robot` and `.resource` files and executes them with Robot Framework.
+
+---
+
+### Use Case 2: Visual & Structural Regression Testing Across Environments (`diff`)
+The ideal CI/CD pre-deployment check: **compare Production vs. Staging/Preview** before releasing a new version.
+
+```bash
+# Compare Production with a Staging / Pull Request preview environment:
 agent-rf diff \
-  file:///path/to/demo_app/v1/index.html \
-  file:///path/to/demo_app/v2/index.html \
-  --output-dir ./generated_tests/diff_suite \
+  https://app.mycompany.com \
+  https://staging.mycompany.com \
+  --output-dir ./regression_suite \
   --run
 ```
 
-### 2. Intent-Driven Exploratory Mode (`explore`)
-Provide a target URL and a natural language goal. The agent maps the screen with numbered visual markers (Set-of-Marks) and generates a complete end-to-end test suite:
+**What the agent does:**
+1. Inspects both environments side-by-side.
+2. Generates a **visual diff heatmap** image highlighting changed visual regions (buttons shifted, new banners, updated layout).
+3. Performs a structural DOM diff identifying added fields, removed components, and altered labels.
+4. Dynamically writes and runs Robot Framework regression tests verifying both the new features and existing user flows.
+
+---
+
+### Use Case 3: Autonomous Self-Healing for Broken Locators in CI/CD (`run --heal`)
+When front-end developers update IDs, CSS classes, or button wrappers, automated test suites often break (flaky tests). The agent self-heals broken locators without human intervention.
 
 ```bash
-agent-rf explore \
-  file:///path/to/demo_app/v1/index.html \
-  --intent "Fill in user details, select professional plan, and submit order" \
-  --output-dir ./generated_tests/explore_suite \
-  --run
-```
-
-### 3. Execution with Self-Healing (`run`)
-Runs an existing test suite with automated failure diagnosis and locator self-repair:
-
-```bash
-agent-rf run ./tests/demo_healing/broken_suite.robot \
-  --url file:///path/to/demo_app/v1/index.html \
+agent-rf run ./tests_login/suite_login.robot \
+  --url https://app.mycompany.com/login \
   --heal
 ```
 
-### 4. Visual Inspection & Locator Mapping (`inspect`)
-Inspects any webpage, produces a Set-of-Marks annotated screenshot, and outputs a candidate locators table:
+**What the agent does:**
+1. Executes the test suite and detects locator failures in `output.xml`.
+2. Automatically triggers the healing engine: re-inspects the live webpage at the moment of failure.
+3. Maps current elements, identifies where the target element moved or what its new locator is, and patches the `.resource` keyword file.
+4. Re-executes the test and marks the build as passed.
+
+---
+
+### Use Case 4: Visual UI Auditing & Set-of-Marks Mapping (`inspect`)
+Audit any web page to inspect its interactive elements, coordinate boundaries, and candidate locators.
 
 ```bash
-agent-rf inspect file:///path/to/demo_app/v1/index.html --output-dir ./inspection_output
+agent-rf inspect https://example.com --output-dir ./audit_result
+```
+Outputs:
+- `annotated_view.png`: Visual screenshot labeled with Set-of-Marks badges (`[1]`, `[2]`, ...).
+- Markdown table in terminal with tags, `data-testid`, IDs, text, and prioritized locators.
+
+---
+
+### Running the Built-in Demo Application
+The repository includes a two-version local demo app (`demo_app/v1` baseline and `demo_app/v2` with promotions, modals, and new fields):
+
+```bash
+# 1. Run visual diff against the demo application:
+agent-rf diff \
+  "file://$(pwd)/demo_app/v1/index.html" \
+  "file://$(pwd)/demo_app/v2/index.html" \
+  --output-dir ./demo_diff_results \
+  --headed
+
+# 2. Run exploratory testing on demo app:
+agent-rf explore \
+  "file://$(pwd)/demo_app/v1/index.html" \
+  --intent "Fill username, select professional plan, and submit order" \
+  --headed
 ```
 
 ---
 
-## 🧪 Structure of Generated Tests
+## 🧪 Unit Tests & Code Coverage
 
-Adhering to Robot Framework and Page Object best practices, generated suites are cleanly separated into:
-- **`suite.robot`**: Focuses on high-level, human-readable business scenarios and test cases.
-- **`resources/suite.resource`**: Contains granular UI keywords (`New Page`, `Click`, `Fill Text`, `Get Text`, `Take Screenshot`) and resilient locator variables (`data-testid`, `id`, `text`).
+The repository maintains strict test coverage enforced via `pytest-cov` and CI checks:
+
+```bash
+# Run test suite with coverage report (fails if below 80%):
+pytest
+```
+- **19 unit tests passing**
+- **91.82% code coverage**
 
 ---
 
-## 📊 Reports & Visual Artifacts
-After test execution, standard Robot Framework reports and screenshots are generated in `results/`:
-- `report.html`: High-level executive test metrics and summary.
-- `log.html`: In-depth execution log with step-by-step keyword parameters and evidence screenshots.
-- `output.xml`: Machine-readable XML report for CI/CD pipelines.
+## ⚙️ CI/CD Pipeline (GitHub Actions)
+
+A complete workflow is configured at `.github/workflows/ci.yml`:
+- **Matrix testing**: Python `3.11` and `3.12` on `ubuntu-latest`.
+- **Browser caching**: Caches Playwright Chromium and Node modules.
+- **Coverage enforcement**: Validates `--cov-fail-under=80`.
+- **End-to-End smoke tests**: Runs `agent-rf diff` and `agent-rf inspect` on every push and pull request.
+
+---
+
+## 📊 Reports & Artifacts
+
+After execution, standard Robot Framework reports and evidence are available in `results/`:
+- `report.html`: High-level executive test metrics and pass/fail summary.
+- `log.html`: Detailed execution log with keyword call trees, timestamps, and failure traces.
+- `output.xml`: Machine-readable XML report for CI/CD integrations.
+- `evidencia_*.png`: High-resolution evidence screenshots captured during test runs.
 
 ---
 

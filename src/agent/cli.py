@@ -23,20 +23,21 @@ console = Console()
 
 @app.command()
 def explore(
-    url: str = typer.Argument(..., help="URL da aplicação a ser inspecionada e testada"),
+    url: str = typer.Argument(..., help="URL da aplicação a ser inspecionada e testada (ex: https://seu-site.com)"),
     intent: str = typer.Option("Testar fluxo principal de ponta a ponta", "--intent", "-i", help="Objetivo do teste em linguagem natural"),
     output_dir: str = typer.Option("./generated_tests", "--output-dir", "-o", help="Diretório de saída dos testes e artefatos"),
     run: bool = typer.Option(True, "--run/--no-run", "-r", help="Executar os testes automaticamente após a geração"),
-    heal: bool = typer.Option(True, "--heal/--no-heal", "-h", help="Ativar auto-recuperação (self-healing) em caso de falha")
+    heal: bool = typer.Option(True, "--heal/--no-heal", "-h", help="Ativar auto-recuperação (self-healing) em caso de falha"),
+    headless: bool = typer.Option(True, "--headless/--headed", help="Executar navegador em segundo plano (headless) ou visível na tela (headed)")
 ):
     """Inspeciona a interface, analisa os elementos visuais via Set-of-Marks e gera a suíte Robot Framework."""
     out_path = Path(output_dir)
     out_path.mkdir(parents=True, exist_ok=True)
 
-    console.print(Panel(f"[bold cyan]Modo Exploratório / Orientado a Intenção[/bold cyan]\nAlvo: [yellow]{url}[/yellow]\nObjetivo: [green]{intent}[/green]"))
+    console.print(Panel(f"[bold cyan]Modo Exploratório / Orientado a Intenção[/bold cyan]\nAlvo: [yellow]{url}[/yellow]\nObjetivo: [green]{intent}[/green]\nModo do Navegador: [magenta]{'Headless (Segundo plano)' if headless else 'Headed (Janela visível)'}[/magenta]"))
 
     # 1. Inspecionar página e capturar elementos
-    inspector = BrowserInspector()
+    inspector = BrowserInspector(headless=headless)
     console.print("[1/4] Inspecionando página e capturando árvore de elementos...", style="blue")
     screenshot_path, elements, title = inspector.inspect_page(url, out_path / "inspection", "explore")
     console.print(f"  -> Título da página: [bold]{title}[/bold]")
@@ -52,6 +53,8 @@ def explore(
     console.print("[3/4] Solicitando raciocínio e geração ao LLM Multimodal...", style="blue")
     llm = LLMClient()
     suite_def = llm.generate_suite_for_explore(url, intent, annotated_img, elements, elements_summary)
+    if not headless:
+        suite_def.variables["${HEADLESS}"] = "False"
 
     # 4. Escrever arquivos do Robot Framework
     console.print("[4/4] Formatando e gerando arquivos modulares do Robot Framework...", style="blue")
@@ -73,11 +76,12 @@ def explore(
     if run:
         console.print("\n[bold green]Iniciando execução com Robot Framework...[/bold green]")
         runner = RobotRunner()
+        var_overrides = {"HEADLESS": "False"} if not headless else {}
         if heal:
             healer = SelfHealer(llm, inspector, runner)
             exec_result, retries = healer.run_with_healing(robot_path, url, out_path / "results")
         else:
-            exec_result = runner.run_suite(robot_path, out_path / "results")
+            exec_result = runner.run_suite(robot_path, out_path / "results", variable_overrides=var_overrides)
             retries = 0
 
         _display_execution_result(exec_result, retries)
@@ -85,19 +89,20 @@ def explore(
 
 @app.command()
 def diff(
-    baseline_url: str = typer.Argument(..., help="URL da versão baseline (anterior)"),
-    target_url: str = typer.Argument(..., help="URL da versão modificada (atual)"),
+    baseline_url: str = typer.Argument(..., help="URL da versão baseline (ex: https://prod.meusite.com)"),
+    target_url: str = typer.Argument(..., help="URL da versão modificada (ex: https://staging.meusite.com)"),
     output_dir: str = typer.Option("./generated_tests/diff_suite", "--output-dir", "-o", help="Diretório de saída"),
     run: bool = typer.Option(True, "--run/--no-run", "-r", help="Executar os testes após a geração"),
-    heal: bool = typer.Option(True, "--heal/--no-heal", "-h", help="Ativar auto-recuperação")
+    heal: bool = typer.Option(True, "--heal/--no-heal", "-h", help="Ativar auto-recuperação"),
+    headless: bool = typer.Option(True, "--headless/--headed", help="Executar navegador em segundo plano (headless) ou visível na tela (headed)")
 ):
     """Detecta alterações visuais e estruturais entre duas versões da aplicação e gera testes de regressão dinâmicos."""
     out_path = Path(output_dir)
     out_path.mkdir(parents=True, exist_ok=True)
 
-    console.print(Panel(f"[bold cyan]Modo Comparação Visual & Estrutural (Diff)[/bold cyan]\nBaseline: [yellow]{baseline_url}[/yellow]\nAtualizada: [green]{target_url}[/green]"))
+    console.print(Panel(f"[bold cyan]Modo Comparação Visual & Estrutural (Diff)[/bold cyan]\nBaseline: [yellow]{baseline_url}[/yellow]\nAtualizada: [green]{target_url}[/green]\nModo do Navegador: [magenta]{'Headless (Segundo plano)' if headless else 'Headed (Janela visível)'}[/magenta]"))
 
-    inspector = BrowserInspector()
+    inspector = BrowserInspector(headless=headless)
     console.print("[1/5] Inspecionando versão Baseline...", style="blue")
     base_shot, base_elements, _ = inspector.inspect_page(baseline_url, out_path / "baseline", "v1")
 
@@ -119,6 +124,8 @@ def diff(
     console.print("[4/5] Solicitando geração de testes focados nas alterações ao LLM...", style="blue")
     llm = LLMClient()
     suite_def = llm.generate_suite_for_diff(baseline_url, target_url, diff_img, target_elements, changes, diff_summary, elements_summary)
+    if not headless:
+        suite_def.variables["${HEADLESS}"] = "False"
 
     # Escrever arquivos
     console.print("[5/5] Gerando suíte Robot Framework...", style="blue")
@@ -139,11 +146,12 @@ def diff(
     if run:
         console.print("\n[bold green]Executando testes de regressão gerados...[/bold green]")
         runner = RobotRunner()
+        var_overrides = {"HEADLESS": "False"} if not headless else {}
         if heal:
             healer = SelfHealer(llm, inspector, runner)
             exec_result, retries = healer.run_with_healing(robot_path, target_url, out_path / "results")
         else:
-            exec_result = runner.run_suite(robot_path, out_path / "results")
+            exec_result = runner.run_suite(robot_path, out_path / "results", variable_overrides=var_overrides)
             retries = 0
 
         _display_execution_result(exec_result, retries)
@@ -154,19 +162,21 @@ def run(
     robot_file: str = typer.Argument(..., help="Caminho do arquivo .robot para execução"),
     target_url: Optional[str] = typer.Option(None, "--url", "-u", help="URL alvo para permitir auto-recuperação (self-healing)"),
     heal: bool = typer.Option(True, "--heal/--no-heal", "-h", help="Ativar auto-recuperação em caso de falha"),
+    headless: bool = typer.Option(True, "--headless/--headed", help="Executar navegador em segundo plano (headless) ou visível na tela (headed)"),
     output_dir: Optional[str] = typer.Option(None, "--output-dir", "-o", help="Diretório de saída dos logs")
 ):
     """Executa uma suíte de teste existente com Robot Framework e relatório formatado."""
     file_path = Path(robot_file)
     runner = RobotRunner()
+    var_overrides = {"HEADLESS": "False"} if not headless else {}
 
     if heal and target_url:
-        inspector = BrowserInspector()
+        inspector = BrowserInspector(headless=headless)
         llm = LLMClient()
         healer = SelfHealer(llm, inspector, runner)
         exec_result, retries = healer.run_with_healing(file_path, target_url, Path(output_dir) if output_dir else None)
     else:
-        exec_result = runner.run_suite(file_path, Path(output_dir) if output_dir else None)
+        exec_result = runner.run_suite(file_path, Path(output_dir) if output_dir else None, variable_overrides=var_overrides)
         retries = 0
 
     _display_execution_result(exec_result, retries)
@@ -174,7 +184,8 @@ def run(
 
 @app.command()
 def inspect(
-    url: str = typer.Argument(..., help="URL da página para inspeção"),
+    url: str = typer.Argument(..., help="URL da página para inspeção (ex: https://seu-site.com)"),
+    headless: bool = typer.Option(True, "--headless/--headed", help="Executar navegador em segundo plano (headless) ou visível na tela (headed)"),
     output_dir: str = typer.Option("./inspection_output", "--output-dir", "-o", help="Diretório de saída da inspeção")
 ):
     """Apenas inspeciona uma página web, extrai elementos interativos e gera screenshot Set-of-Marks."""
@@ -183,7 +194,7 @@ def inspect(
 
     console.print(Panel(f"[bold cyan]Inspeção Visual & Set-of-Marks[/bold cyan]\nAlvo: [yellow]{url}[/yellow]"))
 
-    inspector = BrowserInspector()
+    inspector = BrowserInspector(headless=headless)
     screenshot_path, elements, title = inspector.inspect_page(url, out_path, "inspect")
 
     annotator = VisualAnnotator()
