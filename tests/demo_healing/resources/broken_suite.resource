@@ -3,7 +3,7 @@ Documentation    Recursos com seletor desatualizado
 Library          Browser
 
 *** Variables ***
-${URL}                  file:///home/marcoswferreira/repos/test-automation-agent/demo_app/v1/index.html
+${URL}                  file://${EXECDIR}/demo_app/v1/index.html
 ${BROWSER}              chromium
 ${HEADLESS}             True
 ${DEFAULT_TIMEOUT}      2s

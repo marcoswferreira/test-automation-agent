@@ -75,6 +75,7 @@ class TestSuiteDefinition(BaseModel):
 
 class TestExecutionResult(BaseModel):
     """Result of running a Robot Framework test suite."""
+    __test__ = False
     success: bool
     total_tests: int
     passed_tests: int

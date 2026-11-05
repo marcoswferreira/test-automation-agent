@@ -19,7 +19,8 @@ dependencies = [
     "rich>=13.7.0",
     "jinja2>=3.1.0",
     "google-genai>=0.1.0",
-    "pytest>=8.0.0"
+    "pytest>=8.0.0",
+    "pytest-cov>=5.0.0"
 ]
 
 [project.scripts]
@@ -27,4 +28,10 @@ agent-rf = "agent.cli:app"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "--cov=src/agent --cov-report=term-missing --cov-report=xml --cov-fail-under=80"
+
 
