@@ -1,134 +1,140 @@
-# Agente de Automação de Testes (Robot Framework + LLM Multimodal)
+# Test Automation Agent (Robot Framework + Multimodal LLM)
 
-Uma ferramenta inteligente e autônoma de automação de testes web que:
-1. **Avalia mudanças visuais e estruturais** na interface da aplicação (Baseline vs Versão Atualizada).
-2. **Explora telas autonomamente** a partir de objetivos em linguagem natural.
-3. **Aplica visão computacional multimodal** com a técnica **Set-of-Marks (SoM)** para identificar elementos interativos e calcular seletores robustos.
-4. **Gera dinamicamente scripts modulares em Robot Framework** (`.robot` + `.resource`) utilizando a moderna biblioteca **Playwright** (`robotframework-browser`).
-5. **Executa e auto-repara (Self-Healing)** os testes automaticamente em caso de quebra de seletores ou mudanças de layout.
+[Versão em Português](README.pt-BR.md)
+
+An autonomous, intelligent web test automation tool that:
+1. **Evaluates visual and structural UI changes** between application versions (Baseline vs. Updated release).
+2. **Explores interfaces autonomously** driven by high-level natural language user goals.
+3. **Applies multimodal computer vision** using the **Set-of-Marks (SoM)** technique to map interactive elements and compute resilient locators.
+4. **Dynamically generates idiomatic, modular Robot Framework suites** (`.robot` + `.resource`) powered by **Playwright** (`robotframework-browser`).
+5. **Executes and Self-Heals tests automatically** when locators break or UI layouts shift.
 
 ---
 
-## 🛠️ Arquitetura do Sistema
+## 🛠️ System Architecture
 
 ```mermaid
 flowchart TD
-    subgraph Vision ["1. Visão & Inspeção (Playwright + OpenCV + Pillow)"]
-        Page["Aplicação Web (URL)"] --> Inspector["Browser Inspector"]
+    subgraph Vision ["1. Vision & Inspection (Playwright + OpenCV + Pillow)"]
+        Page["Target Web App (URL)"] --> Inspector["Browser Inspector"]
         Inspector --> Screenshots["Screenshots"]
         Inspector --> DOM["DOM & Bounding Boxes"]
         Screenshots --> SoM["Set-of-Marks Annotator"]
         Screenshots --> Differ["Visual & Structural Differ"]
     end
 
-    subgraph LLM ["2. Raciocínio & LLM Multimodal (Gemini Vision)"]
-        SoM --> LLMClient["LLM Multimodal Engine"]
+    subgraph LLM ["2. Reasoning & Multimodal LLM (Gemini Vision)"]
+        SoM --> LLMClient["Multimodal LLM Engine"]
         Differ --> LLMClient
-        UserIntent["Objetivo / Intent"] --> LLMClient
-        LLMClient --> StructuredPlan["Plano Estruturado & Casos de Teste"]
+        UserIntent["Goal / Intent Prompt"] --> LLMClient
+        LLMClient --> StructuredPlan["Structured Test Plan & Keywords"]
     end
 
-    subgraph Generation ["3. Geração Robot Framework"]
+    subgraph Generation ["3. Robot Framework Generation"]
         StructuredPlan --> RobotWriter["Robot Framework Modular Writer"]
-        RobotWriter --> RobotFiles[".robot (Testes) + .resource (Keywords)"]
+        RobotWriter --> RobotFiles[".robot (Tests) + .resource (Keywords)"]
     end
 
-    subgraph Execution ["4. Execução & Auto-Reparo (Self-Healing)"]
+    subgraph Execution ["4. Execution & Self-Healing Loop"]
         RobotFiles --> Runner["Robot Framework Runner (`robot`)"]
-        Runner -->|Falha| Healer["Self-Healer Loop"]
-        Healer -->|Reinspeciona tela & Corrige seletor| RobotFiles
-        Runner -->|Sucesso| Reports["Relatórios HTML & XML"]
+        Runner -->|Failure detected| Healer["Self-Healing Loop"]
+        Healer -->|Re-inspects live UI & patches locator| RobotFiles
+        Runner -->|Success| Reports["HTML & XML Test Reports"]
     end
 ```
 
 ---
 
-## 🚀 Instalação e Configuração
+## 🚀 Installation & Setup
 
-### Pré-requisitos
+### Prerequisites
 - Python 3.10+
-- Node.js 18+ (para o backend do Playwright do `robotframework-browser`)
+- Node.js 18+ (required by `robotframework-browser` Playwright backend)
 
-### Configuração do Ambiente
+### Environment Setup
 
 ```bash
-# 1. Crie e ative o ambiente virtual
+# 1. Create and activate virtual environment
 python3 -m venv .venv
 source .venv/bin/activate
 
-# 2. Instale as dependências
+# 2. Install dependencies
 pip install -r requirements.txt
 
-# 3. Inicialize o backend do Robot Framework Browser
+# 3. Initialize Robot Framework Browser backend and Chromium
 rfbrowser init --skip-browsers
 playwright install chromium
 
-# 4. Instale o pacote local no modo editável
+# 4. Install the package in editable mode
 pip install -e . --no-build-isolation --no-deps
 ```
 
-### Configuração de API (Opcional para Gemini Vision)
-Se desejar utilizar os modelos de visão multimodal da nuvem (Gemini), defina a chave de API:
+### API Key Configuration (Optional for Cloud Gemini Vision)
+If you want to use cloud-hosted multimodal models (Gemini), export your API key:
 ```bash
-export GEMINI_API_KEY="sua_chave_aqui"
+export GEMINI_API_KEY="your_api_key_here"
 ```
-*(Nota: O agente possui um gerador heurístico inteligente integrado que funciona 100% offline mesmo sem chave de API).*
+*(Note: The agent includes an intelligent offline heuristic engine that runs with 100% functionality and zero external dependencies when no API key is provided).*
 
 ---
 
-## 💻 Como Usar (CLI `agent-rf`)
+## 💻 How to Use (`agent-rf` CLI)
 
-### 1. Modo Comparação Visual (Diff & Testes de Regressão)
-Compara a versão baseline com uma versão atualizada da aplicação, destaca as alterações visuais (bounding boxes/heatmap) e gera testes de regressão dinamicamente:
+### 1. Visual Difference & Regression Mode (`diff`)
+Compares a baseline version with an updated release, highlights visual shifts with heatmaps/bounding boxes, and dynamically generates regression tests covering new and modified elements:
 
 ```bash
 agent-rf diff \
-  file:///caminho/demo_app/v1/index.html \
-  file:///caminho/demo_app/v2/index.html \
+  file:///path/to/demo_app/v1/index.html \
+  file:///path/to/demo_app/v2/index.html \
   --output-dir ./generated_tests/diff_suite \
   --run
 ```
 
-### 2. Modo Exploratório Orientado a Intenção
-Forneça a URL e um objetivo em linguagem natural. O agente mapeia a tela com marcadores visuais (Set-of-Marks) e gera a suíte completa:
+### 2. Intent-Driven Exploratory Mode (`explore`)
+Provide a target URL and a natural language goal. The agent maps the screen with numbered visual markers (Set-of-Marks) and generates a complete end-to-end test suite:
 
 ```bash
 agent-rf explore \
-  file:///caminho/demo_app/v1/index.html \
-  --intent "Preencher dados do cliente, selecionar plano profissional e submeter pedido" \
+  file:///path/to/demo_app/v1/index.html \
+  --intent "Fill in user details, select professional plan, and submit order" \
   --output-dir ./generated_tests/explore_suite \
   --run
 ```
 
-### 3. Execução com Auto-Recuperação (Self-Healing)
-Executa uma suíte de teste existente com diagnóstico e correção automática de seletores em caso de falha:
+### 3. Execution with Self-Healing (`run`)
+Runs an existing test suite with automated failure diagnosis and locator self-repair:
 
 ```bash
 agent-rf run ./tests/demo_healing/broken_suite.robot \
-  --url file:///caminho/demo_app/v1/index.html \
+  --url file:///path/to/demo_app/v1/index.html \
   --heal
 ```
 
-### 4. Inspeção e Mapeamento Visual
-Inspeciona uma página e gera o screenshot com as marcações *Set-of-Marks* e a tabela de seletores candidatos:
+### 4. Visual Inspection & Locator Mapping (`inspect`)
+Inspects any webpage, produces a Set-of-Marks annotated screenshot, and outputs a candidate locators table:
 
 ```bash
-agent-rf inspect file:///caminho/demo_app/v1/index.html --output-dir ./inspection_output
+agent-rf inspect file:///path/to/demo_app/v1/index.html --output-dir ./inspection_output
 ```
 
 ---
 
-## 🧪 Estrutura dos Testes Gerados
+## 🧪 Structure of Generated Tests
 
-Seguindo as melhores práticas do Robot Framework, os testes são divididos em:
-- **`suíte.robot`**: Foco em legibilidade e regras de negócio de alto nível.
-- **`resources/suíte.resource`**: Keywords de página, ações granulares no navegador (`New Page`, `Click`, `Fill Text`, `Get Text`, `Take Screenshot`) e variáveis de seletores (`data-testid`, `id`, `text`).
+Adhering to Robot Framework and Page Object best practices, generated suites are cleanly separated into:
+- **`suite.robot`**: Focuses on high-level, human-readable business scenarios and test cases.
+- **`resources/suite.resource`**: Contains granular UI keywords (`New Page`, `Click`, `Fill Text`, `Get Text`, `Take Screenshot`) and resilient locator variables (`data-testid`, `id`, `text`).
 
 ---
 
-## 📊 Relatórios e Evidências
-Após a execução de qualquer comando, o Robot Framework gera automaticamente no diretório `results/`:
-- `report.html`: Visão executiva dos testes e métricas de aprovação.
-- `log.html`: Log detalhado com todos os passos, parâmetros e capturas de tela (*screenshots*).
-- `output.xml`: Resultados em XML para integração contínua (CI/CD).
+## 📊 Reports & Visual Artifacts
+After test execution, standard Robot Framework reports and screenshots are generated in `results/`:
+- `report.html`: High-level executive test metrics and summary.
+- `log.html`: In-depth execution log with step-by-step keyword parameters and evidence screenshots.
+- `output.xml`: Machine-readable XML report for CI/CD pipelines.
 
+---
+
+## 📄 License
+MIT License.
