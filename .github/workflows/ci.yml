@@ -72,3 +72,4 @@ jobs:
           agent-rf --help
           agent-rf inspect "file://$(pwd)/demo_app/v1/index.html" --output-dir ./smoke_inspect
           agent-rf diff "file://$(pwd)/demo_app/v1/index.html" "file://$(pwd)/demo_app/v2/index.html" --output-dir ./smoke_diff --run
+

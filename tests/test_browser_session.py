@@ -27,3 +27,4 @@ def test_browser_inspector_inspect_page(tmp_path):
     assert first_el.bbox.width > 0
     assert first_el.bbox.height > 0
     assert len(first_el.selector_candidates) > 0
+

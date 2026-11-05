@@ -197,3 +197,4 @@ def test_gemini_multimodal_call(tmp_path):
     mock_resp.text = json.dumps({"explanation": "Mock fix", "repaired_steps": ["Click    id=ok"]})
     heal_fix = client.generate_healing_fix("test", "err", "step", [], fake_img)
     assert heal_fix["explanation"] == "Mock fix"
+

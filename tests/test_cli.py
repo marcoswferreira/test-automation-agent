@@ -73,3 +73,4 @@ Pass Test
     result = runner.invoke(app, ["run", str(test_robot), "--output-dir", str(tmp_path / "results"), "--no-heal"])
     assert result.exit_code == 0
     assert "PASS" in result.output
+

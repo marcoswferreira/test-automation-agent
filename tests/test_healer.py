@@ -119,3 +119,4 @@ Click Element
     assert final_res.success is True
     assert retries == 1
     assert "id=correct" in res_file.read_text(encoding="utf-8")
+
